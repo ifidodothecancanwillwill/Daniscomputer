@@ -20,26 +20,23 @@ try {
     Handle-Error "Failed to set High-Performance power plan."
 }
 
-# Perform Disk Cleanup
-try {
+# Perform Disk Cleanup in the background job
+Start-Job -ScriptBlock {
     cleanmgr /sagerun:1
-    Write-Host "Disk cleanup executed successfully." -ForegroundColor Green
-} catch {
-    Handle-Error "Failed to perform disk cleanup."
-}
+} | Wait-Job
 
-# Disable Unnecessary Windows Services (SysMain and Windows Search)
-try {
-    Get-Service | Where-Object { $_.DisplayName -like "Windows Search" -or $_.DisplayName -like "SysMain" } | Stop-Service -Force -ErrorAction SilentlyContinue
-    Get-Service | Where-Object { $_.DisplayName -like "Windows Search" -or $_.DisplayName -like "SysMain" } | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
-    Write-Host "Unnecessary services disabled successfully." -ForegroundColor Green
-} catch {
-    Handle-Error "Failed to disable unnecessary services."
-}
+Write-Host "Disk cleanup executed successfully." -ForegroundColor Green
+
+# Batch Processing for Services
+$services = Get-Service | Where-Object { $_.DisplayName -like "Windows Search" -or $_.DisplayName -like "SysMain" }
+$services | Stop-Service -Force -ErrorAction SilentlyContinue
+$services | Set-Service -StartupType Disabled -ErrorAction SilentlyContinue
+
+Write-Host "Unnecessary services disabled successfully." -ForegroundColor Green
 
 # Adjust Virtual Memory
 try {
-    $cs = Get-WmiObject Win32_ComputerSystem
+    $cs = Get-WmiObject Win32_ComputerSystem | Select-Object AutomaticManagedPagefile
     $cs.AutomaticManagedPagefile = $False
     $cs.Put()
     Set-WmiInstance -Class Win32_PageFileSetting -Arguments @{Name = "C:\pagefile.sys"; InitialSize = 4096; MaximumSize = 8192} -ErrorAction SilentlyContinue
@@ -62,14 +59,6 @@ try {
     Write-Host "Bloatware uninstalled successfully." -ForegroundColor Green
 } catch {
     Handle-Error "Failed to uninstall bloatware."
-}
-
-# Disable Animations for Speed
-try {
-    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "VisualFXSetting" -Value 2 -ErrorAction SilentlyContinue
-    Write-Host "Animations disabled successfully." -ForegroundColor Green
-} catch {
-    Handle-Error "Failed to disable animations."
 }
 
 Write-Host "All Optimization Tasks Completed. Thank you." -ForegroundColor Green
